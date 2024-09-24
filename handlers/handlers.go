@@ -114,12 +114,14 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot generate token"})
 	}
 
-	// Include the user's role in the response
+	// Include the user's role and username in the response
 	return c.JSON(fiber.Map{
-		"token": t,
-		"role":  user.Role, // Add this line to include the role
+		"token":    t,
+		"role":     user.Role,     // Include the role
+		"username": user.Username,  // Include the username
 	})
 }
+
 
 
 func (h *Handler) ApproveUser(c *fiber.Ctx) error {
@@ -176,6 +178,30 @@ func (h *Handler) GetPackages(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(packages)
+}
+
+func (h *Handler) DeleteUser(c *fiber.Ctx) error {
+    userID := c.Params("id")
+
+    objectID, err := primitive.ObjectIDFromHex(userID)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
+    }
+
+    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("users")
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    result, err := collection.DeleteOne(ctx, bson.M{"_id": objectID})
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot delete user"})
+    }
+
+    if result.DeletedCount == 0 {
+        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+    }
+
+    return c.JSON(fiber.Map{"message": "User deleted successfully"})
 }
 
 func (h *Handler) AdminSetPackage(c *fiber.Ctx) error {

@@ -60,6 +60,8 @@ func main() {
 	app.Get("/users", h.GetAllUsers)
 	app.Post("/admin/approve", h.ApproveUser)
 	app.Post("/admin/set-package", h.AdminSetPackage)
+	app.Delete("/users/:id", h.DeleteUser)
+	
 	// Start server
 	log.Fatal(app.Listen(":3000"))
 }
