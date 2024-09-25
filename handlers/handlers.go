@@ -45,7 +45,6 @@ func (h *Handler) GetAllUsers(c *fiber.Ctx) error {
 
     return c.JSON(users)
 }
-
 func (h *Handler) Register(c *fiber.Ctx) error {
 	var user models.User
 	if err := c.BodyParser(&user); err != nil {
@@ -65,6 +64,11 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
+	// ตรวจสอบให้แน่ใจว่าได้ส่งค่าชื่อโรงพยาบาล
+	if user.Hospital == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Hospital is required"})
+	}
+
 	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -80,30 +84,45 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(user)
 }
 
+
+
 func (h *Handler) Login(c *fiber.Ctx) error {
 	var loginUser struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Identifier string `json:"identifier"`  // รับค่าเป็นทั้ง email หรือ username
+		Password   string `json:"password"`
 	}
 
+	// ตรวจสอบการส่งข้อมูลใน request
 	if err := c.BodyParser(&loginUser); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
 	}
 
+	// เชื่อมต่อกับ collection "users"
 	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// สร้าง query เพื่อค้นหาผู้ใช้ด้วย email หรือ username
 	var user models.User
-	err := collection.FindOne(ctx, bson.M{"email": loginUser.Email}).Decode(&user)
+	filter := bson.M{
+		"$or": []bson.M{
+			{"email": loginUser.Identifier},
+			{"username": loginUser.Identifier},
+		},
+	}
+
+	// ดึงข้อมูลผู้ใช้ที่ตรงกับ email หรือ username
+	err := collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid email or password"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid email/username or password"})
 	}
 
+	// ตรวจสอบความถูกต้องของ password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password)); err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid email or password"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid email/username or password"})
 	}
 
+	// สร้าง JWT token
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.ID
@@ -114,13 +133,23 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot generate token"})
 	}
 
-	// Include the user's role and username in the response
+	// ส่ง response กลับไปพร้อมกับข้อมูลผู้ใช้
 	return c.JSON(fiber.Map{
-		"token":    t,
-		"role":     user.Role,     // Include the role
-		"username": user.Username,  // Include the username
+		"token":     t,
+		"id":        user.ID.Hex(),       // ส่ง ID ของผู้ใช้
+		"username":  user.Username,       // ส่ง username
+		"email":     user.Email,          // ส่ง email
+		"password":  user.Password,       // ส่ง password (ถ้าจำเป็น แต่ควรปกป้องข้อมูล)
+		"role":      user.Role,           // ส่ง role
+		"status":    user.Status,         // ส่งสถานะ
+		"package":   user.Package,        // ส่ง package
+		"hospital":  user.Hospital,       // ส่งชื่อโรงพยาบาล
+		"createdAt": user.CreatedAt,      // ส่งวันที่สร้าง
+		"updatedAt": user.UpdatedAt,      // ส่งวันที่อัพเดตล่าสุด
 	})
 }
+
+
 
 
 
