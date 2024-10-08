@@ -1,23 +1,22 @@
 # Build stage
-FROM golang:1.22.6 AS builder
-
+FROM golang:1.22.6 
+# Set the working directory inside the container
 WORKDIR /app
 
-COPY go.mod go.sum ./
+# Copy go.mod and go.sum files
+COPY backend/user-auth-api/go.mod backend/user-auth-api/go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-COPY . .
+# Copy the source code into the container
+COPY backend/user-auth-api .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+# Build the Go app
+RUN go build -o main .
 
-# Run stage
-FROM alpine:3.14
-
-WORKDIR /app
-
-COPY --from=builder /app/main .
-COPY .env .
-
+# Expose port 8080 to the outside world
 EXPOSE 3000
 
+# Command to run the executable
 CMD ["./main"]

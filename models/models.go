@@ -25,3 +25,16 @@ type Package struct {
 	Price       float64            `json:"price" bson:"price"`
 	Features    []string           `json:"features" bson:"features"`
 }
+
+type Patient struct {
+	ID                  primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	ImageName           string             `json:"image_name" bson:"image_name"`
+	Age                 int                `json:"age" bson:"age"`
+	Gender              string             `json:"gender" bson:"gender"` // Should be "Male" or "Female"
+	DurationOfLesion    string             `json:"duration_of_lesion" bson:"duration_of_lesion"` // e.g., weeks, months, years
+	Expansion           string             `json:"expansion" bson:"expansion"` // e.g., Buccolingual, Anteroposterior
+	Paresthesia         bool               `json:"paresthesia" bson:"paresthesia"` // true for Yes, false for No
+	NumberOfLesions     string             `json:"number_of_lesions" bson:"number_of_lesions"` // e.g., Single lesion, Multiple lesions
+	CreatedAt           time.Time          `json:"created_at" bson:"createdAt"`
+	UpdatedAt           time.Time          `json:"updated_at" bson:"updatedAt"`
+}

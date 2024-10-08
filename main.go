@@ -61,6 +61,10 @@ func main() {
 	app.Post("/admin/approve", h.ApproveUser)
 	app.Post("/admin/set-package", h.AdminSetPackage)
 	app.Delete("/users/:id", h.DeleteUser)
+
+	app.Post("/patients", h.CreatePatient)
+	app.Put("/patients/:id", h.UpdatePatient)
+	app.Delete("/patients/:id", h.DeletePatient)
 	
 	// Start server
 	log.Fatal(app.Listen(":3000"))

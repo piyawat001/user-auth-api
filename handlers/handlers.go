@@ -285,3 +285,83 @@ func (h *Handler) AdminSetPackage(c *fiber.Ctx) error {
     return c.JSON(fiber.Map{"message": "User package and role updated successfully"})
 }
 
+
+func (h *Handler) CreatePatient(c *fiber.Ctx) error {
+	var patient models.Patient
+	if err := c.BodyParser(&patient); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
+	}
+
+	patient.CreatedAt = time.Now()
+	patient.UpdatedAt = time.Now()
+
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("patients")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := collection.InsertOne(ctx, patient)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot insert patient"})
+	}
+
+	patient.ID = result.InsertedID.(primitive.ObjectID)
+
+	return c.Status(fiber.StatusCreated).JSON(patient)
+}
+
+func (h *Handler) UpdatePatient(c *fiber.Ctx) error {
+	patientID := c.Params("id")
+	objectID, err := primitive.ObjectIDFromHex(patientID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid patient ID"})
+	}
+
+	var patient models.Patient
+	if err := c.BodyParser(&patient); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
+	}
+
+	patient.UpdatedAt = time.Now()
+
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("patients")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	update := bson.M{
+		"$set": patient,
+	}
+
+	result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot update patient"})
+	}
+
+	if result.ModifiedCount == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Patient not found"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Patient updated successfully"})
+}
+
+func (h *Handler) DeletePatient(c *fiber.Ctx) error {
+	patientID := c.Params("id")
+	objectID, err := primitive.ObjectIDFromHex(patientID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid patient ID"})
+	}
+
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("patients")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := collection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot delete patient"})
+	}
+
+	if result.DeletedCount == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Patient not found"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Patient deleted successfully"})
+}
