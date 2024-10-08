@@ -364,3 +364,25 @@ func (h *Handler) DeletePatient(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Patient deleted successfully"})
 }
+
+func (h *Handler) GetAllPatients(c *fiber.Ctx) error {
+    // เชื่อมต่อกับ collection "patients"
+    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("patients")
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // ค้นหาข้อมูลผู้ป่วยทั้งหมด
+    cursor, err := collection.Find(ctx, bson.M{})
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot fetch patients"})
+    }
+    defer cursor.Close(ctx)
+
+    var patients []models.Patient
+    // ดึงข้อมูลทั้งหมดจาก cursor และเก็บใน slice patients
+    if err = cursor.All(ctx, &patients); err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot decode patients"})
+    }
+
+    return c.JSON(patients)
+}

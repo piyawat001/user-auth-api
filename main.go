@@ -65,6 +65,7 @@ func main() {
 	app.Post("/patients", h.CreatePatient)
 	app.Put("/patients/:id", h.UpdatePatient)
 	app.Delete("/patients/:id", h.DeletePatient)
+	app.Get("/allpatients", h.GetAllPatients)
 	
 	// Start server
 	log.Fatal(app.Listen(":3000"))
