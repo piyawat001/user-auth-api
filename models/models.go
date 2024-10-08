@@ -29,12 +29,13 @@ type Package struct {
 type Patient struct {
 	ID                  primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	ImageName           string             `json:"image_name" bson:"image_name"`
-	Age                 int                `json:"age" bson:"age"`
-	Gender              string             `json:"gender" bson:"gender"` // Should be "Male" or "Female"
-	DurationOfLesion    string             `json:"duration_of_lesion" bson:"duration_of_lesion"` // e.g., weeks, months, years
-	Expansion           string             `json:"expansion" bson:"expansion"` // e.g., Buccolingual, Anteroposterior
-	Paresthesia         bool               `json:"paresthesia" bson:"paresthesia"` // true for Yes, false for No
-	NumberOfLesions     string             `json:"number_of_lesions" bson:"number_of_lesions"` // e.g., Single lesion, Multiple lesions
+	Confirmation        string             `json:"confirm" bson:"confirm"` // Agree or Disagree
+	Age                 int                `json:"age" bson:"age"`         // Consider using int for age
+	Gender              string             `json:"gender" bson:"gender"`   // Male or Female
+	DurationOfLesion    string             `json:"duration_of_lesion" bson:"duration_of_lesion"` // weeks, months, years
+	Expansion           string             `json:"expansion" bson:"expansion"` // Buccolingual, Anteroposterior
+	Paresthesia         bool               `json:"paresthesia" bson:"paresthesia"` // Yes or No
+	NumberOfLesions     string             `json:"number_of_lesions" bson:"number_of_lesions"` // Single lesion, Multiple lesions
 	CreatedAt           time.Time          `json:"created_at" bson:"createdAt"`
 	UpdatedAt           time.Time          `json:"updated_at" bson:"updatedAt"`
 }

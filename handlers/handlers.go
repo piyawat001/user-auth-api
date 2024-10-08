@@ -342,7 +342,6 @@ func (h *Handler) UpdatePatient(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Patient updated successfully"})
 }
-
 func (h *Handler) DeletePatient(c *fiber.Ctx) error {
 	patientID := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(patientID)
