@@ -66,7 +66,14 @@ func main() {
 	app.Put("/patients/:id", h.UpdatePatient)
 	app.Delete("/patients/:id", h.DeletePatient)
 	app.Get("/allpatients", h.GetAllPatients)
-	
+
+	app.Post("/questions", h.CreateQuestion)
+	app.Get("/questions/:id", h.GetQuestionByID)
+	app.Put("/questions/:id", h.UpdateQuestionStatus)
+	app.Get("/users/:userId/questions", h.ListQuestionsByUserID)
+	app.Get("/admin/pending-questions", h.ListPendingQuestions)
+	app.Get("/users/:userId/notifications", h.GetNotificationsByUserID)
+	app.Put("/notifications/:id/read", h.MarkNotificationAsRead)
 	// Start server
 	log.Fatal(app.Listen(":3000"))
 }

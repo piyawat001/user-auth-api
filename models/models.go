@@ -39,3 +39,25 @@ type Patient struct {
 	CreatedAt           time.Time          `json:"created_at" bson:"createdAt"`
 	UpdatedAt           time.Time          `json:"updated_at" bson:"updatedAt"`
 }
+
+type Question struct {
+    ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+    UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
+    AdminID    primitive.ObjectID `json:"admin_id,omitempty" bson:"admin_id,omitempty"`
+    Title      string             `json:"title" bson:"title"`
+    Content    string             `json:"content" bson:"content"`
+    Status     string             `json:"status" bson:"status"` // "pending", "answered", "closed"
+    Answer     string             `json:"answer,omitempty" bson:"answer,omitempty"`
+    CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
+    UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
+    ReadStatus bool               `json:"read_status" bson:"read_status"`
+}
+
+type Notification struct {
+    ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+    UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
+    QuestionID primitive.ObjectID `json:"question_id" bson:"question_id"`
+    Message    string             `json:"message" bson:"message"`
+    IsRead     bool               `json:"is_read" bson:"is_read"`
+    CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
+}
