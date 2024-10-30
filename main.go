@@ -67,13 +67,16 @@ func main() {
 	app.Delete("/patients/:id", h.DeletePatient)
 	app.Get("/allpatients", h.GetAllPatients)
 
+
 	app.Post("/questions", h.CreateQuestion)
-	app.Get("/questions/:id", h.GetQuestionByID)
-	app.Put("/questions/:id", h.UpdateQuestionStatus)
-	app.Get("/users/:userId/questions", h.ListQuestionsByUserID)
-	app.Get("/admin/pending-questions", h.ListPendingQuestions)
-	app.Get("/users/:userId/notifications", h.GetNotificationsByUserID)
+	app.Get("/questions/user/:userId", h.GetMyQuestions) // ดูประวัติคำถามของผู้ใช้
+	app.Get("/questions/:id", h.GetQuestionDetail)         // ดูรายละเอียดคำถามเฉพาะข้อ
+	app.Delete("/questions/:id", h.DeleteQuestion)            // อัพเดตคำถามหรือตอบคำถาม
+	app.Get("/notifications/user/:userId", h.GetUserNotifications)
 	app.Put("/notifications/:id/read", h.MarkNotificationAsRead)
+	app.Get("/notifications/count/:userId", h.GetNotificationCount)
+	app.Get("/pendingQuestions", h.GetPendingQuestions) // ฟังก์ชันสำหรับดึงคำถามที่ admin ยังไม่ได้ตอบ
+	app.Put("/questions/:id", h.UpdateQuestion) // ฟังก์ชันสำหรับดึงคำถามที่ admin ยังไม่ได้ตอบ
 	// Start server
 	log.Fatal(app.Listen(":3000"))
 }

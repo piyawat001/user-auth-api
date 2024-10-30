@@ -46,18 +46,34 @@ type Question struct {
     AdminID    primitive.ObjectID `json:"admin_id,omitempty" bson:"admin_id,omitempty"`
     Title      string             `json:"title" bson:"title"`
     Content    string             `json:"content" bson:"content"`
-    Status     string             `json:"status" bson:"status"` // "pending", "answered", "closed"
+    Status     string             `json:"status" bson:"status"` // "pending", "inProgress", "answered", "closed", "deleted"
     Answer     string             `json:"answer,omitempty" bson:"answer,omitempty"`
     CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
     UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
-    ReadStatus bool               `json:"read_status" bson:"read_status"`
+    ReadStatus struct {
+        User  bool `json:"user" bson:"user"`   // ผู้ใช้อ่านคำตอบหรือยัง
+        Admin bool `json:"admin" bson:"admin"` // แอดมินอ่านคำถามหรือยัง
+    } `json:"read_status" bson:"read_status"`
+    
 }
 
+// Notification struct สำหรับเก็บการแจ้งเตือน
 type Notification struct {
+    ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+    ReceiverID  primitive.ObjectID `json:"receiver_id" bson:"receiver_id"`      // ID ของผู้รับการแจ้งเตือน
+    SenderID    primitive.ObjectID `json:"sender_id" bson:"sender_id"`          // ID ของผู้ส่งการแจ้งเตือน
+    QuestionID  primitive.ObjectID `json:"question_id" bson:"question_id"`
+    Type        string            `json:"type" bson:"type"`                     // "new_question", "new_answer", "status_update", "edited"
+    Message     string            `json:"message" bson:"message"`
+    IsRead      bool              `json:"is_read" bson:"is_read"`
+    CreatedAt   time.Time         `json:"created_at" bson:"created_at"`
+    RedirectURL string            `json:"redirect_url" bson:"redirect_url"`     // URL สำหรับนำทางเมื่อคลิกที่การแจ้งเตือน
+}
+
+// NotificationCounter struct สำหรับนับจำนวนการแจ้งเตือนที่ยังไม่ได้อ่าน
+type NotificationCounter struct {
     ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
     UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
-    QuestionID primitive.ObjectID `json:"question_id" bson:"question_id"`
-    Message    string             `json:"message" bson:"message"`
-    IsRead     bool               `json:"is_read" bson:"is_read"`
-    CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
+    UnreadCount int               `json:"unread_count" bson:"unread_count"`
+    LastChecked time.Time         `json:"last_checked" bson:"last_checked"`
 }
