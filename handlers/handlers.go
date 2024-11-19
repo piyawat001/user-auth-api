@@ -399,7 +399,7 @@ func (h *Handler) CreateQuestion(c *fiber.Ctx) error {
     question.Status = "pending"
     question.ReadStatus.User = true
     question.ReadStatus.Admin = false
-
+	question.ReadStatus.NotificationBell = false
 
     collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -546,6 +546,40 @@ func (h *Handler) GetQuestionsByUser(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(questions)
+}
+
+func (h *Handler) UpdateNotificationBellStatus(c *fiber.Ctx) error {
+    userID := c.Params("userId")
+    objectID, err := primitive.ObjectIDFromHex(userID)
+    if err != nil {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
+    }
+
+    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+
+    // อัพเดตทุกคำถามของผู้ใช้
+    result, err := collection.UpdateMany(
+        ctx,
+        bson.M{"user_id": objectID},
+        bson.M{
+            "$set": bson.M{
+                "read_status.notification_bell": true,
+                "updated_at": time.Now(),
+            },
+        },
+    )
+    if err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+            "error": "Cannot update notification bell status",
+        })
+    }
+
+    return c.JSON(fiber.Map{
+        "message": "Notification bell status updated successfully",
+        "modified_count": result.ModifiedCount,
+    })
 }
 
 /// DeleteQuestion ลบคำถาม

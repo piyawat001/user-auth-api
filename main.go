@@ -71,6 +71,7 @@ func main() {
 	app.Post("/questions", h.CreateQuestion)
 	app.Get("/questions/user/:userId", h.GetMyQuestions) // ดูประวัติคำถามของผู้ใช้
 	app.Get("/questions/:id", h.GetQuestionDetail)         // ดูรายละเอียดคำถามเฉพาะข้อ
+	app.Put("/questions/notification-bell/:userId", h.UpdateNotificationBellStatus)         
 	app.Delete("/questions/:id", h.DeleteQuestion)            // อัพเดตคำถามหรือตอบคำถาม
 	app.Get("/notifications/user/:userId", h.GetUserNotifications)
 	app.Put("/notifications/:id/read", h.MarkNotificationAsRead)
