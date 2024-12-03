@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"os"
+	"strconv"
 	"time"
 
 	"fmt"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/piyawat001/user-auth-api/models"
@@ -383,56 +385,59 @@ func (h *Handler) GetAllPatients(c *fiber.Ctx) error {
 
 // ฟังก์ชันสำหรับสร้างคำถามใหม่
 func (h *Handler) CreateQuestion(c *fiber.Ctx) error {
-    var question models.Question
-    if err := c.BodyParser(&question); err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
-    }
+	var question models.Question
+	if err := c.BodyParser(&question); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse JSON"})
+	}
 
-    // ตรวจสอบข้อมูลที่จำเป็น
-    if question.Title == "" || question.Content == "" {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Title and content are required"})
-    }
+	// Validation
+	if question.Title == "" || question.Content == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Title and content are required"})
+	}
 
-    // เซ็ตค่าเริ่มต้น
-    question.CreatedAt = time.Now()
-    question.UpdatedAt = time.Now()
-    question.Status = "pending"
-    question.ReadStatus.User = true
-    question.ReadStatus.Admin = false
+	// Set default values
+	question.CreatedAt = time.Now()
+	question.UpdatedAt = time.Now()
+	question.Status = "pending"
+	question.ReadStatus.User = true
+	question.ReadStatus.Admin = false
 	question.ReadStatus.NotificationBell = false
 
-    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	// Optionally, set AdminID to null initially
+	question.AdminID = primitive.NilObjectID
 
-    result, err := collection.InsertOne(ctx, question)
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot create question"})
-    }
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    question.ID = result.InsertedID.(primitive.ObjectID)
+	result, err := collection.InsertOne(ctx, question)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot create question"})
+	}
 
-    // สร้างการแจ้งเตือนสำหรับแอดมิน
-    if question.AdminID != primitive.NilObjectID {
-        notification := models.Notification{
-            ReceiverID:  question.AdminID,
-            SenderID:    question.UserID,
-            QuestionID:  question.ID,
-            Type:        "new_question",
-            Message:     "New question: " + question.Title,
-            IsRead:      false,
-            CreatedAt:   time.Now(),
-            RedirectURL: "/questions/" + question.ID.Hex(),
-        }
+	question.ID = result.InsertedID.(primitive.ObjectID)
 
-        notifCollection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("notifications")
-        _, err = notifCollection.InsertOne(ctx, notification)
-        if err != nil {
-            fmt.Printf("Error creating notification: %v\n", err)
-        }
-    }
+	// Create a notification (optional)
+	go func() {
+		notifCollection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("notifications")
+		notification := models.Notification{
+			ReceiverID:  primitive.NilObjectID, // Admin can be added later
+			SenderID:    question.UserID,
+			QuestionID:  question.ID,
+			Type:        "new_question",
+			Message:     fmt.Sprintf("New Question: %s", question.Title),
+			IsRead:      false,
+			CreatedAt:   time.Now(),
+			RedirectURL: fmt.Sprintf("/questions/%s", question.ID.Hex()),
+		}
 
-    return c.Status(fiber.StatusCreated).JSON(question)
+		_, err := notifCollection.InsertOne(ctx, notification)
+		if err != nil {
+			fmt.Printf("Error creating notification: %v\n", err)
+		}
+	}()
+
+	return c.Status(fiber.StatusCreated).JSON(question)
 }
 
 // GetUserQuestions ดึงประวัติคำถามของผู้ใช้
@@ -443,12 +448,23 @@ func (h *Handler) GetMyQuestions(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
 	}
 
+	// Parse query parameters for pagination
+	page := c.Query("page", "1")
+	pageSize := c.Query("page_size", "10")
+	pageInt, err := strconv.Atoi(page)
+	if err != nil || pageInt <= 0 {
+		pageInt = 1
+	}
+	pageSizeInt, err := strconv.Atoi(pageSize)
+	if err != nil || pageSizeInt <= 0 {
+		pageSizeInt = 10
+	}
+
 	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// ค้นหาคำถามทั้งหมดของผู้ใช้ และเรียงตามวันที่สร้างล่าสุด
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	opts := options.Find().SetSkip(int64((pageInt - 1) * pageSizeInt)).SetLimit(int64(pageSizeInt)).SetSort(bson.D{{Key: "created_at", Value: -1}})
 	cursor, err := collection.Find(ctx, bson.M{"user_id": objectID}, opts)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot fetch questions"})
@@ -463,6 +479,8 @@ func (h *Handler) GetMyQuestions(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"total":     len(questions),
 		"questions": questions,
+		"page":      pageInt,
+		"page_size": pageSizeInt,
 	})
 }
 
@@ -549,40 +567,41 @@ func (h *Handler) GetQuestionsByUser(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateNotificationBellStatus(c *fiber.Ctx) error {
-    userID := c.Params("userId")
-    objectID, err := primitive.ObjectIDFromHex(userID)
-    if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
-    }
 
-    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	userID := c.Params("userId")
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
 
-    // อัพเดตทุกคำถามของผู้ใช้
-    result, err := collection.UpdateMany(
-        ctx,
-        bson.M{"user_id": objectID},
-        bson.M{
-            "$set": bson.M{
-                "read_status.notification_bell": true,
-                "updated_at": time.Now(),
-            },
-        },
-    )
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "error": "Cannot update notification bell status",
-        })
-    }
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    return c.JSON(fiber.Map{
-        "message": "Notification bell status updated successfully",
-        "modified_count": result.ModifiedCount,
-    })
+	// อัพเดตทุกคำถามของผู้ใช้
+	result, err := collection.UpdateMany(
+		ctx,
+		bson.M{"user_id": objectID},
+		bson.M{
+			"$set": bson.M{
+				"read_status.notification_bell": true,
+				"updated_at":                    time.Now(),
+			},
+		},
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Cannot update notification bell status",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message":        "Notification bell status updated successfully",
+		"modified_count": result.ModifiedCount,
+	})
 }
 
-/// DeleteQuestion ลบคำถาม
+// / DeleteQuestion ลบคำถาม
 func (h *Handler) DeleteQuestion(c *fiber.Ctx) error {
 	questionID := c.Params("id")
 	objectID, err := primitive.ObjectIDFromHex(questionID)
@@ -606,7 +625,6 @@ func (h *Handler) DeleteQuestion(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Question deleted successfully"})
 }
-
 
 // Notification Handlers
 func (h *Handler) GetUserNotifications(c *fiber.Ctx) error {
@@ -664,7 +682,9 @@ func (h *Handler) MarkNotificationAsRead(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetNotificationCount(c *fiber.Ctx) error {
-	userID := c.Params("userId")
+	userID := c.Params("id")        // เปลี่ยนเป็น "id" แทน "userId"
+	role := c.Query("role", "user") // Default to user, can specify admin
+
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
@@ -674,37 +694,54 @@ func (h *Handler) GetNotificationCount(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	count, err := collection.CountDocuments(ctx, bson.M{
-		"receiver_id": objectID,
-		"is_read":     false,
-	})
+	var filter bson.M
+	if role == "admin" {
+		// Count notifications for admin (e.g., pending questions)
+		filter = bson.M{
+			"receiver_id": objectID,
+			"type":        "new_question", // ตัวอย่างเช่น การแจ้งเตือนคำถามใหม่
+			"is_read":     false,
+		}
+	} else {
+		// Count unread notifications for user
+		filter = bson.M{
+			"receiver_id": objectID,
+			"is_read":     false,
+		}
+	}
+
+	count, err := collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot count notifications"})
 	}
 
-	return c.JSON(fiber.Map{"unread_count": count})
+	return c.JSON(fiber.Map{
+		"unread_count": count,
+		"role":         role,
+	})
 }
+
 // ฟังก์ชันสำหรับดึงคำถามที่ admin ยังไม่ได้ตอบ
 func (h *Handler) GetPendingQuestions(c *fiber.Ctx) error {
-    collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+	collection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("questions")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    // ค้นหาคำถามที่มีสถานะเป็น "pending" หรือ "inProgress"
-    cursor, err := collection.Find(ctx, bson.M{
-        "status": bson.M{"$in": []string{"pending", "inProgress"}},
-    })
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot fetch questions"})
-    }
-    defer cursor.Close(ctx)
+	// ค้นหาคำถามที่มีสถานะเป็น "pending" หรือ "inProgress"
+	cursor, err := collection.Find(ctx, bson.M{
+		"status": bson.M{"$in": []string{"pending", "inProgress"}},
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot fetch questions"})
+	}
+	defer cursor.Close(ctx)
 
-    var questions []models.Question
-    if err = cursor.All(ctx, &questions); err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot decode questions"})
-    }
+	var questions []models.Question
+	if err = cursor.All(ctx, &questions); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Cannot decode questions"})
+	}
 
-    return c.JSON(questions)
+	return c.JSON(questions)
 }
 
 // UpdateQuestion อัพเดตคำถามหรือคำตอบ
@@ -729,66 +766,35 @@ func (h *Handler) UpdateQuestion(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Get original question
-	var originalQuestion models.Question
-	err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&originalQuestion)
-	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Question not found"})
-	}
-
 	update := bson.M{
-		"$set": bson.M{
-			"updated_at": time.Now(),
-		},
+		"$set": bson.M{"updated_at": time.Now()},
 	}
 
-	// Update content if provided (user editing question)
 	if updateData.Content != "" {
 		update["$set"].(bson.M)["content"] = updateData.Content
 		update["$set"].(bson.M)["is_edited"] = true
-
-		// Add to edit history
-		editEntry := struct {
-			Content  string    `json:"content" bson:"content"`
-			EditedAt time.Time `json:"edited_at" bson:"edited_at"`
-			EditedBy string    `json:"edited_by" bson:"edited_by"`
-		}{
-			Content:  updateData.Content,
-			EditedAt: time.Now(),
-			EditedBy: "user",
+		update["$push"] = bson.M{
+			"edit_history": bson.M{
+				"content":   updateData.Content,
+				"edited_at": time.Now(),
+				"edited_by": "admin", // Replace with actual user ID
+			},
 		}
-		update["$push"] = bson.M{"edit_history": editEntry}
 	}
 
-	// Update answer if provided (admin answering)
 	if updateData.Answer != "" {
 		update["$set"].(bson.M)["answer"] = updateData.Answer
 		update["$set"].(bson.M)["status"] = "answered"
 		update["$set"].(bson.M)["read_status.admin"] = true
 		update["$set"].(bson.M)["read_status.user"] = false
-
-		// Create notification for user
-		notification := models.Notification{
-			ReceiverID:  originalQuestion.UserID,
-			SenderID:    originalQuestion.AdminID,
-			QuestionID:  originalQuestion.ID,
-			Type:        "new_answer",
-			Message:     "คำถามของคุณได้รับการตอบแล้ว",
-			IsRead:      false,
-			CreatedAt:   time.Now(),
-			RedirectURL: "/questions/" + originalQuestion.ID.Hex(),
-		}
-
-		notifCollection := h.client.Database(os.Getenv("DATABASE_NAME")).Collection("notifications")
-		_, err = notifCollection.InsertOne(ctx, notification)
-		if err != nil {
-			fmt.Printf("Error creating notification: %v\n", err)
-		}
 	}
 
-	// Update status if provided
 	if updateData.Status != "" {
 		update["$set"].(bson.M)["status"] = updateData.Status
+	}
+
+	if len(update["$set"].(bson.M)) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "No valid fields to update"})
 	}
 
 	result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)

@@ -10,21 +10,22 @@ type User struct {
 	Username  string             `json:"username" bson:"username"`
 	Email     string             `json:"email" bson:"email"`
 	Password  string             `json:"password" bson:"password"`
-	Role      string             `json:"role" bson:"role"`
-	Status    string             `json:"status" bson:"status"`
-	Package   string             `json:"package" bson:"package"`
-	Hospital  string             `json:"hospital" bson:"hospital"` // ใช้ชื่อโรงพยาบาลแทน ID
+	Role      string             `json:"role" bson:"role"` // Role can be Admin, Faculty of Dentistry, Affiliated Hospitals, Other
+	Status    string             `json:"status" bson:"status"` // Active, Inactive, etc.
+	Package   string             `json:"package" bson:"package"` // Basic, Plus, Premium
+	Hospital  string             `json:"hospital" bson:"hospital"` // Hospital name
 	CreatedAt time.Time          `json:"created_at" bson:"createdAt"`
 	UpdatedAt time.Time          `json:"updated_at" bson:"updatedAt"`
 }
 
 type Package struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Name        string             `json:"name" bson:"name"`
+	Name        string             `json:"name" bson:"name"` // Basic, Plus, Premium
 	Description string             `json:"description" bson:"description"`
 	Price       float64            `json:"price" bson:"price"`
 	Features    []string           `json:"features" bson:"features"`
 }
+
 
 type Patient struct {
 	ID               primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
@@ -41,39 +42,38 @@ type Patient struct {
 }
 
 type Question struct {
-	ID         primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
-	AdminID    primitive.ObjectID `json:"admin_id,omitempty" bson:"admin_id,omitempty"`
-	Title      string             `json:"title" bson:"title"`
-	Content    string             `json:"content" bson:"content"`
-	Status     string             `json:"status" bson:"status"` // "pending", "inProgress", "answered", "closed", "deleted"
-	Answer     string             `json:"answer,omitempty" bson:"answer,omitempty"`
-	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt  time.Time          `json:"updated_at" bson:"updated_at"`
-	ReadStatus struct {
-		User             bool `json:"user" bson:"user"`                           // ผู้ใช้อ่านคำตอบหรือยัง
-		Admin            bool `json:"admin" bson:"admin"`                         // แอดมินอ่านคำถามหรือยัง
-		NotificationBell bool `json:"notification_bell" bson:"notification_bell"` // กรณีผู้ใช้ยังไม่ได้อ่านคำตอบและมีการแจ้งเตือนที่ยังไม่ได้อ่าน
+	ID           primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID       primitive.ObjectID `json:"user_id" bson:"user_id"`
+	AdminID      primitive.ObjectID `json:"admin_id,omitempty" bson:"admin_id,omitempty"`
+	Title        string             `json:"title" bson:"title"`
+	Content      string             `json:"content" bson:"content"`
+	Status       string             `json:"status" bson:"status"` // "pending", "inProgress", "answered", "closed", "deleted"
+	Answer       string             `json:"answer,omitempty" bson:"answer,omitempty"`
+	IsEdited     bool               `json:"is_edited" bson:"is_edited"`
+	EditHistory  []EditEntry        `json:"edit_history,omitempty" bson:"edit_history,omitempty"`
+	CreatedAt    time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at" bson:"updated_at"`
+	ReadStatus   struct {
+		User             bool `json:"user" bson:"user"`
+		Admin            bool `json:"admin" bson:"admin"`
+		NotificationBell bool `json:"notification_bell" bson:"notification_bell"`
 	} `json:"read_status" bson:"read_status"`
 }
 
-// Notification struct สำหรับเก็บการแจ้งเตือน
+type EditEntry struct {
+	Content  string    `json:"content" bson:"content"`
+	EditedAt time.Time `json:"edited_at" bson:"edited_at"`
+	EditedBy string    `json:"edited_by" bson:"edited_by"`
+}
+
 type Notification struct {
 	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	ReceiverID  primitive.ObjectID `json:"receiver_id" bson:"receiver_id"` // ID ของผู้รับการแจ้งเตือน
-	SenderID    primitive.ObjectID `json:"sender_id" bson:"sender_id"`     // ID ของผู้ส่งการแจ้งเตือน
+	ReceiverID  primitive.ObjectID `json:"receiver_id" bson:"receiver_id"`
+	SenderID    primitive.ObjectID `json:"sender_id" bson:"sender_id"`
 	QuestionID  primitive.ObjectID `json:"question_id" bson:"question_id"`
-	Type        string             `json:"type" bson:"type"` // "new_question", "new_answer", "status_update", "edited"
+	Type        string             `json:"type" bson:"type"`
 	Message     string             `json:"message" bson:"message"`
 	IsRead      bool               `json:"is_read" bson:"is_read"`
 	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
-	RedirectURL string             `json:"redirect_url" bson:"redirect_url"` // URL สำหรับนำทางเมื่อคลิกที่การแจ้งเตือน
-}
-
-// NotificationCounter struct สำหรับนับจำนวนการแจ้งเตือนที่ยังไม่ได้อ่าน
-type NotificationCounter struct {
-	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID      primitive.ObjectID `json:"user_id" bson:"user_id"`
-	UnreadCount int                `json:"unread_count" bson:"unread_count"`
-	LastChecked time.Time          `json:"last_checked" bson:"last_checked"`
+	RedirectURL string             `json:"redirect_url" bson:"redirect_url"`
 }

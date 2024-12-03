@@ -13,7 +13,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/piyawat001/user-auth-api/handlers"
-	"github.com/piyawat001/user-auth-api/middleware"
 )
 
 var client *mongo.Client
@@ -39,45 +38,47 @@ func main() {
 
 	// เพิ่ม CORS Middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:8080", // แก้ไขเป็นที่อยู่ของ Frontend
+		AllowOrigins:     "*", // อนุญาตทุกแหล่งที่มา
 		AllowMethods:     "GET,POST,PUT,DELETE",
 		AllowHeaders:     "Content-Type,Authorization",
-		AllowCredentials: true, // หากคุณใช้คุกกี้หรือ Authorization headers
+		AllowCredentials: false, // ไม่รองรับ cookies หรือ headers
 	}))
 
 	// Set up handlers with MongoDB client
 	h := handlers.NewHandler(client)
 
-	// Public routes
-	app.Post("/register", h.Register)
-	app.Post("/login", h.Login)
-	app.Get("/packages", h.GetPackages)
+	//create users
+	app.Post("/register", h.Register) 
+	app.Post("/login", h.Login) 
 
-	// Apply authentication middleware
-	app.Use(middleware.Auth)
+	//user
+	app.Get("/users", h.GetAllUsers)       // ดึงข้อมูลผู้ใช้ทั้งหมด
+	app.Delete("/users/:id", h.DeleteUser) // ลบผู้ใช้
 
-	// Protected routes
-	app.Get("/users", h.GetAllUsers)
+	//Admin Routes
+	app.Post("/admin/approve", h.ApproveUser)           // อนุมัติผู้ใช้
+	app.Post("/admin/set-package", h.AdminSetPackage)   // ตั้งค่าชุดแพ็กเกจ
+	app.Get("/pendingQuestions", h.GetPendingQuestions) // ดึงคำถามที่ยังไม่ได้ตอบ
 	app.Post("/admin/approve", h.ApproveUser)
-	app.Post("/admin/set-package", h.AdminSetPackage)
-	app.Delete("/users/:id", h.DeleteUser)
-
-	app.Post("/patients", h.CreatePatient)
-	app.Put("/patients/:id", h.UpdatePatient)
-	app.Delete("/patients/:id", h.DeletePatient)
-	app.Get("/allpatients", h.GetAllPatients)
 
 
-	app.Post("/questions", h.CreateQuestion)
-	app.Get("/questions/user/:userId", h.GetMyQuestions) // ดูประวัติคำถามของผู้ใช้
-	app.Get("/questions/:id", h.GetQuestionDetail)         // ดูรายละเอียดคำถามเฉพาะข้อ
-	app.Put("/questions/notification-bell/:userId", h.UpdateNotificationBellStatus)         
-	app.Delete("/questions/:id", h.DeleteQuestion)            // อัพเดตคำถามหรือตอบคำถาม
-	app.Get("/notifications/user/:userId", h.GetUserNotifications)
-	app.Put("/notifications/:id/read", h.MarkNotificationAsRead)
-	app.Get("/notifications/count/:userId", h.GetNotificationCount)
-	app.Get("/pendingQuestions", h.GetPendingQuestions) // ฟังก์ชันสำหรับดึงคำถามที่ admin ยังไม่ได้ตอบ
-	app.Put("/questions/:id", h.UpdateQuestion) // ฟังก์ชันสำหรับดึงคำถามที่ admin ยังไม่ได้ตอบ
+	//Patient Routes
+	app.Post("/patients", h.CreatePatient)       // สร้างข้อมูลผู้ป่วยใหม่
+	app.Put("/patients/:id", h.UpdatePatient)    // แก้ไขข้อมูลผู้ป่วย
+	app.Delete("/patients/:id", h.DeletePatient) // ลบข้อมูลผู้ป่วย
+	app.Get("/allpatients", h.GetAllPatients)    // ดึงข้อมูลผู้ป่วยทั้งหมด
+
+	//Question Routes
+	app.Post("/questions", h.CreateQuestion)                                        // สร้างคำถามใหม่
+	app.Get("/questions/user/:userId", h.GetMyQuestions)                            // ดึงประวัติคำถามของผู้ใช้
+	app.Get("/questions/:id", h.GetQuestionDetail)                                  // ดึงรายละเอียดคำถามเฉพาะข้อ
+	app.Put("/questions/:id", h.UpdateQuestion)                                     // อัปเดตคำถาม (หรือการตอบคำถาม)
+	app.Put("/questions/notification-bell/:userId", h.UpdateNotificationBellStatus) // อัปเดตสถานะแจ้งเตือน
+	app.Delete("/questions/:id", h.DeleteQuestion)                                  // ลบคำถาม
+
+	app.Get("/notifications/:id", h.GetNotificationCount)        // นับจำนวนการแจ้งเตือน
+	app.Put("/notifications/:id/read", h.MarkNotificationAsRead) // ทำเครื่องหมายว่าแจ้งเตือนถูกอ่านแล้ว
+
 	// Start server
 	log.Fatal(app.Listen(":3000"))
 }

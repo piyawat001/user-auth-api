@@ -1,22 +1,27 @@
-# Build stage
-FROM golang:1.22.6 
-# Set the working directory inside the container
+# 1. เลือก Base Image
+FROM golang:1.22-alpine
+
+
+# 2. ตั้งค่า Working Directory ภายใน Container
 WORKDIR /app
 
-# Copy go.mod and go.sum files
-COPY backend/user-auth-api/go.mod backend/user-auth-api/go.sum ./
+# 3. คัดลอกไฟล์ go.mod และ go.sum เพื่อติดตั้ง dependencies ก่อน
+COPY go.mod go.sum ./
 
-# Download dependencies
+# 4. ติดตั้ง dependencies
 RUN go mod download
 
-# Copy the source code into the container
-COPY backend/user-auth-api .
+# 5. คัดลอกโค้ดทั้งหมดที่เกี่ยวข้องเข้า Container
+COPY . .
 
-# Build the Go app
+# คัดลอกไฟล์ .env เข้าไปใน Container
+COPY .env .env
+
+# 6. Build แอปพลิเคชัน Go
 RUN go build -o main .
 
-# Expose port 8080 to the outside world
-EXPOSE 3000
+# 7. ระบุพอร์ตที่แอปจะรัน (ถ้าจำเป็น)
+EXPOSE 8080
 
-# Command to run the executable
+# 8. คำสั่งสำหรับเริ่มแอป
 CMD ["./main"]
