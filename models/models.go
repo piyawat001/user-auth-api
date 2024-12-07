@@ -1,3 +1,4 @@
+//backend/user-auth-api/models/models.go 
 package models
 
 import (
@@ -77,3 +78,4 @@ type Notification struct {
 	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
 	RedirectURL string             `json:"redirect_url" bson:"redirect_url"`
 }
+
